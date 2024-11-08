@@ -1,0 +1,36 @@
+import com.kamille.gcash.shippingapp.model.PackageModel;
+
+rule "Reject" salience 5
+    when
+        packageModel : PackageModel( weight > 50 );
+    then
+        packageModel.setCost(-1.0f);
+end;
+
+rule "Heavy Parcel" salience 4
+    when
+        packageModel : PackageModel( weight > 10, myWeight: weight );
+    then
+        packageModel.setCost(20f * myWeight);
+end;
+
+rule "Small Parcel" salience 3
+    when
+        packageModel : PackageModel( volume < 1500, myVolume: volume );
+    then
+        packageModel.setCost(0.03f * myVolume);
+end;
+
+rule "Medium Parcel" salience 2
+    when
+        packageModel : PackageModel( volume < 2500, myVolume : volume );
+    then
+        packageModel.setCost(0.04f * myVolume);
+end;
+
+rule "Large Parcel" salience 1
+    when
+        packageModel : PackageModel( true, myVolume : volume );
+    then
+        packageModel.setCost(0.05f * myVolume);
+end;

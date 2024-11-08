@@ -1,0 +1,132 @@
+swagger: "2.0"
+info:
+  description: This is Mynt's Custom API for programming exams.
+  version: 1.1.0
+  title: Mynt Custom API for Programming Exams
+  contact:
+    email: mynt-iat@mynt.xyz
+host: mynt-exam.mocklab.io
+basePath: /
+tags:
+- name: custom-search
+  description: Search API
+- name: voucher
+  description: Voucher API
+schemes:
+- https
+paths:
+  /customsearch:
+    get:
+      tags:
+      - custom-search
+      summary: Search the query term
+      description: ""
+      operationId: customsearch
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - name: q
+        in: query
+        description: Search query parameter./
+        required: true
+        type: string
+        enum:
+        - cat
+        - dog
+        - skdlks
+      - name: cx
+        in: query
+        description: Custom search engine identifier. You may use `myntxyz` for the value.
+        required: true
+        type: string
+        pattern: ^myntxyz$
+      - name: key
+        in: query
+        description: API key to identify the application connecting to the API. You may use `apikey` for the value.
+        required: true
+        type: string
+        pattern: ^apikey$
+      responses:
+        "200":
+          description: query success
+          schema:
+            $ref: '#/definitions/SearchResults'
+        "400":
+          description: invalid search term
+  /voucher/{voucherCode}:
+    get:
+      tags:
+      - voucher
+      summary: Provides the discount percentage for voucher codes
+      description: ""
+      operationId: voucher
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      parameters:
+      - name: voucherCode
+        in: path
+        description: Voucher code to be redeemed
+        required: true
+        type: string
+        enum:
+        - MYNT
+        - GFI
+        - skdlks
+      - name: key
+        in: query
+        description: API key to identify the application connecting to the API. You may use `apikey` for the value.
+        required: true
+        type: string
+        pattern: ^apikey$
+      responses:
+        "200":
+          description: query success
+          schema:
+            $ref: '#/definitions/VoucherItem'
+        "400":
+          description: invalid voucher code
+          schema:
+            $ref: '#/definitions/inline_response_400'
+definitions:
+  SearchResults:
+    type: object
+    properties:
+      items:
+        type: array
+        items:
+          $ref: '#/definitions/SearchResults_items'
+  VoucherItem:
+    type: object
+    properties:
+      code:
+        type: string
+      discount:
+        type: number
+        format: float
+      expiry:
+        type: string
+        format: date
+  inline_response_400:
+    type: object
+    properties:
+      error:
+        type: string
+  SearchResults_items:
+    type: object
+    properties:
+      title:
+        type: string
+      htmlTitle:
+        type: string
+      link:
+        type: string
+      displayLink:
+        type: string
+      formattedUrl:
+        type: string
+      htmlFormattedUrl:
+        type: string
