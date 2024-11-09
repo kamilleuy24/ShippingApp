@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.kamille.gcash.shippingapp.model.PackageModel;
 import io.swagger.client.api.VoucherApi;
 import io.swagger.client.model.VoucherItem;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import org.kie.api.runtime.KieContainer;
 import org.kie.api.runtime.KieSession;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -43,12 +47,19 @@ public class PackageController {
         this.apiKey = apiKey;
     }
 
+    @Operation(summary = "Get package cost", description = "Returns a package cost as per the details provided")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
+            @ApiResponse(responseCode = "405", description = "Bad Request - Wrong Details in the Request"),
+            @ApiResponse(responseCode = "500", description = "Server Error")
+    })
     @PostMapping("/api/calculate")
     @ResponseBody
     public ResponseEntity<String> calculate(@Valid @RequestBody PackageModel packageModel) {
         LOGGER.info("weight: {}, height: {}, width: {}, length: {}, voucherCode: {}", packageModel.getWeight(),
                 packageModel.getHeight(), packageModel.getWidth(), packageModel.getLength(),
                 packageModel.getVoucherCode());
+        // fire off Drools rules
         KieSession kieSession = kieContainer.newKieSession();
         kieSession.insert(packageModel);
         kieSession.fireAllRules(1);
@@ -68,7 +79,7 @@ public class PackageController {
         } else if (packageModel.getVoucherCode() != null && !packageModel.getVoucherCode().isBlank()) {
             Float discount = getVoucherDiscount(packageModel);
             shippingCost -= discount;
-            if (shippingCost < 0f) {
+            if (shippingCost <= 0f) {
                 shippingCostString = "FREE";
             }
         }
@@ -81,23 +92,19 @@ public class PackageController {
     }
 
     private Float getVoucherDiscount(PackageModel packageModel) {
-        try {
-            VoucherItem voucher = voucherApi.voucher(packageModel.getVoucherCode(), apiKey);
-            LOGGER.debug("voucher: {}", voucher);
-            if (voucher != null) {
-                return voucher.getDiscount();
-            }
-        } catch (Exception e) {
-            LOGGER.error(e.getMessage(), e);
+        VoucherItem voucher = voucherApi.voucher(packageModel.getVoucherCode(), apiKey);
+        LOGGER.debug("voucher: {}", voucher);
+        if (voucher != null && voucher.getExpiry().isAfter(LocalDate.now())) {
+            return voucher.getDiscount();
         }
         return 0.0f;
     }
 
-    @ExceptionHandler({InvalidFormatException.class, MethodArgumentNotValidException.class})
+    @ExceptionHandler
     public ResponseEntity<String> handleRequestExceptions(Exception exception) {
         LOGGER.error(exception.getMessage(), exception);
-        String errorMessage = null;
         LOGGER.error("Exception : {}", exception.getClass());
+        String errorMessage = null;
 
         if (exception instanceof HttpMessageNotReadableException) {
             InvalidFormatException invalidFormatException = (InvalidFormatException) ((HttpMessageNotReadableException) exception)
@@ -113,6 +120,9 @@ public class PackageController {
                 sb.append(fieldError.getField()).append(": ").append(fieldError.getDefaultMessage()).append("\n");
             }
             errorMessage = sb.toString().trim();
+        } else {
+            // return server error if not one of the two exceptions above
+            return new ResponseEntity<>(exception.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         return new ResponseEntity<>(errorMessage, HttpStatus.BAD_REQUEST);

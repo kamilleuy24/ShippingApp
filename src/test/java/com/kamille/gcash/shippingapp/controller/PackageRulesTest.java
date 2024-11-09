@@ -14,6 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.support.AnnotationConfigContextLoader;
 
+import java.time.LocalDate;
+import java.time.Month;
+import java.time.Year;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
@@ -83,21 +87,34 @@ public class PackageRulesTest {
     }
 
     @Test
-    public void testValidVoucherDiscount() throws Exception {
+    public void testValidVoucherDiscount() {
         @Valid
         PackageModel packageModel = new PackageModel(8.5f, 23.0f, 19.1f, 17.5f, "MYNT");
         VoucherItem voucherItem = new VoucherItem();
-        voucherItem.discount(12f);
+        voucherItem.setDiscount(12f);
+        voucherItem.setExpiry(LocalDate.of(Year.MAX_VALUE, Month.DECEMBER, 31));
         when(voucherApi.voucher("MYNT", "apikey")).thenReturn(voucherItem);
         ResponseEntity<String> response = controller.calculate(packageModel);
         assertEquals("Shipping Cost: ₱372.39", response.getBody());
     }
 
     @Test
-    public void testInvalidVoucherDiscount() throws Exception {
+    public void testInvalidVoucherDiscount() {
         @Valid
         PackageModel packageModel = new PackageModel(8.5f, 23.0f, 19.1f, 17.5f, "FAKEVOUCHER");
         when(voucherApi.voucher("MYNT", "apikey")).thenReturn(null);
+        ResponseEntity<String> response = controller.calculate(packageModel);
+        assertEquals("Shipping Cost: ₱384.39", response.getBody());
+    }
+
+    @Test
+    public void testExpiredVoucherDiscount() {
+        @Valid
+        PackageModel packageModel = new PackageModel(8.5f, 23.0f, 19.1f, 17.5f, "MYNT");
+        VoucherItem voucherItem = new VoucherItem();
+        voucherItem.setDiscount(12f);
+        voucherItem.setExpiry(LocalDate.of(2022, Month.DECEMBER, 31));
+        when(voucherApi.voucher("MYNT", "apikey")).thenReturn(voucherItem);
         ResponseEntity<String> response = controller.calculate(packageModel);
         assertEquals("Shipping Cost: ₱384.39", response.getBody());
     }
